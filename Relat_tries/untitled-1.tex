@@ -1,0 +1,554 @@
+\documentclass[a4paper,11pt]{report}
+
+%--------------------------------------
+% Pacotes básicos
+%--------------------------------------
+\usepackage[portuguese]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{listings}
+
+\geometry{margin=2.5cm}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue
+}
+
+%--------------------------------------
+% Configuração do listings para código C
+%--------------------------------------
+\lstset{
+  language=C,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{red},
+  numbers=left,
+  numberstyle=\tiny,
+  stepnumber=1,
+  numbersep=5pt,
+  tabsize=2,
+  breaklines=true,
+  showstringspaces=false,
+  frame=single
+}
+
+%--------------------------------------
+\begin{document}
+%--------------------------------------
+
+% CAPA
+\thispagestyle{empty}
+\begin{center}
+  {\Large Algoritmos e Estruturas de Dados}\\[0.3cm]
+  {\large 1º Projeto}\\[0.5cm]
+  {\large Universidade de Aveiro}\\[3cm]
+
+  {\LARGE TAD \texttt{imageRGB}}\\[0.3cm]
+  {\Large Implementação, Verificação e Análise Experimental}\\[3cm]
+
+  \begin{tabular}{c}
+    Victor Miguel Loureiro Vaz da Costa Morais --- 125478 \\
+    Vicente Amorim Silva --- 125160 \\
+  \end{tabular}\\[2cm]
+
+  Dept. de Eletrónica, Telecomunicações e Informática\\
+  Universidade de Aveiro\\[0.8cm]
+
+  \today
+\end{center}
+\clearpage
+
+% PÁGINA DE TÍTULO / RESUMO
+\thispagestyle{empty}
+\begin{center}
+  {\Large Algoritmos e Estruturas de Dados}\\[0.2cm]
+  {\large 1º Projeto}\\[0.2cm]
+  Dept. de Eletrónica, Telecomunicações e Informática\\
+  Universidade de Aveiro\\[1cm]
+
+  {\Large TAD \texttt{imageRGB}}\\[0.3cm]
+  Implementação, Verificação e Análise Experimental\\[1cm]
+
+  Victor Miguel Loureiro Vaz da Costa Morais --- 125478\\
+  Vicente Amorim Silva --- 125160\\[1cm]
+\end{center}
+
+\vspace{0.5cm}
+
+\noindent\textbf{Resumo}\\
+Este relatório descreve o desenvolvimento do TAD \texttt{imageRGB}, um módulo em
+C para manipulação de imagens RGB em modo indexado. Foram implementadas funções
+de cópia profunda de imagens, comparação independente da LUT, rotações
+geométricas, algoritmos de preenchimento de regiões (\emph{region growing}) e
+uma função de segmentação automática baseada nessas operações. É apresentada uma
+análise formal da função \texttt{ImageIsEqual}, bem como um plano de análise
+experimental para avaliar o número de comparações e o desempenho em diferentes
+cenários. Por fim, discute-se a gestão de memória e a utilização de ferramentas
+como Valgrind e AddressSanitizer para detetar fugas.
+
+\clearpage
+\tableofcontents
+\clearpage
+
+%--------------------------------------
+\chapter{Introdução}
+%--------------------------------------
+
+O TAD \texttt{imageRGB} fornece uma abstração para representar imagens em modo
+indexado. Em vez de guardar diretamente os tripletos RGB em cada posição da
+matriz de píxeis, a estrutura mantém uma matriz de índices (\texttt{uint16})
+que referencia uma tabela de cores (LUT -- \emph{Look-Up Table}) com valores
+RGB de 24 bits.
+
+Esta abordagem é útil quando o número de cores distintas é relativamente
+pequeno face ao número total de píxeis da imagem. Permite:
+\begin{itemize}
+  \item reduzir o armazenamento necessário para representar uma imagem;
+  \item alterar cores de forma global, modificando apenas a LUT;
+  \item facilitar operações de segmentação, atribuindo rótulos de região por
+        índice em vez de mexer diretamente em valores RGB.
+\end{itemize}
+
+O código fornecido incluía várias funções marcadas como \texttt{``TO BE
+COMPLETED''}, nomeadamente: \texttt{ImageCopy}, \texttt{ImageIsEqual},
+\texttt{ImageRotate90CW}, \texttt{ImageRotate180CW}, três versões de
+\emph{region filling} e \texttt{ImageSegmentation}. O objetivo deste trabalho
+foi completar essas funções, garantir o seu correto funcionamento e analisar o
+seu comportamento.
+
+\section{Objetivos}
+
+Os objetivos específicos do projeto são:
+\begin{enumerate}
+  \item Implementar todas as funções em falta em \texttt{imageRGB.c}.
+  \item Analisar formalmente a função \texttt{ImageIsEqual}, em termos de
+        complexidade temporal e espacial.
+  \item Implementar três variantes de \emph{region growing} (recursiva,
+        baseada em pilha e baseada em fila) e comparar o seu comportamento.
+  \item Desenvolver um plano de testes experimentais para validar o desempenho
+        da função \texttt{ImageIsEqual} e das funções de preenchimento de
+        regiões.
+  \item Refletir sobre a gestão de memória e propor um processo de validação
+        com Valgrind e AddressSanitizer.
+\end{enumerate}
+
+\section{Estrutura interna do TAD}
+
+Do ponto de vista da implementação, a imagem é representada por:
+
+\begin{verbatim}
+struct image {
+  uint32  width;
+  uint32  height;
+  uint16** image;     // matriz de índices para a LUT
+  uint16  num_colors; // número de cores usadas
+  rgb_t*  LUT;        // tabela de cores RGB de 24 bits
+};
+\end{verbatim}
+
+Cada entrada \texttt{image[v][u]} é um índice na LUT, cujo valor RGB associado
+é obtido por \texttt{LUT[label]}. A LUT tem dimensão fixa
+(\texttt{FIXED\_LUT\_SIZE}) e o campo \texttt{num\_colors} indica quantas cores
+distintas estão atualmente em uso.
+
+Invariantes principais:
+\begin{itemize}
+  \item \texttt{width > 0} e \texttt{height > 0};
+  \item \texttt{image} aponta para um vetor de \texttt{height} linhas, cada
+        uma com \texttt{width} entradas válidas;
+  \item \texttt{num\_colors <= FIXED\_LUT\_SIZE};
+  \item acessos diretos a píxeis são protegidos por
+        \texttt{ImageIsValidPixel}.
+\end{itemize}
+
+%--------------------------------------
+\chapter{\texttt{ImageCopy} e \texttt{ImageIsEqual}}
+%--------------------------------------
+
+\section{\texttt{ImageCopy}}
+
+\subsection*{Descrição informal}
+
+A função \texttt{ImageCopy} recebe uma imagem e devolve uma nova instância com
+as mesmas dimensões, a mesma LUT (copiada) e uma matriz de índices independente
+com conteúdo idêntico. É uma cópia profunda: qualquer alteração na cópia não
+afeta a imagem original.
+
+\subsection*{Implementação}
+
+\begin{lstlisting}[caption={Implementação de ImageCopy},label={lst:imagecopy}]
+Image ImageCopy(const Image img) {
+  assert(img != NULL);
+
+  // Aloca header com as mesmas dimensões
+  Image copy = AllocateImageHeader(img->width, img->height);
+
+  // Copia o conteúdo da LUT em uso
+  copy->num_colors = img->num_colors;
+  for (uint16 i = 0; i < img->num_colors; i++) {
+    copy->LUT[i] = img->LUT[i];
+  }
+
+  // Copia linha a linha a matriz de índices
+  for (uint32 i = 0; i < img->height; i++) {
+    copy->image[i] = AllocateRowArray(img->width);
+    memcpy(copy->image[i], img->image[i], img->width * sizeof(uint16));
+  }
+
+  return copy;
+}
+\end{lstlisting}
+
+\subsection*{Análise formal}
+
+Sejam $W$ e $H$ a largura e a altura da imagem, respetivamente, e
+$N = W \cdot H$ o número total de píxeis.
+
+A função percorre todas as posições da matriz de índices, copiando
+cada entrada uma vez. O custo é, portanto:
+\[
+  T(W,H) = \Theta(W \cdot H) = \Theta(N).
+\]
+
+A memória adicional usada (para além da nova imagem, que é o resultado da
+função) resume-se a variáveis locais e índices de ciclo, logo é $O(1)$.
+
+%--------------------------------------
+\section{\texttt{ImageIsEqual}}
+%--------------------------------------
+
+\subsection*{Descrição informal}
+
+A função \texttt{ImageIsEqual} determina se duas imagens são visualmente
+iguais. Como a LUT pode estar organizada de modo diferente em cada imagem, a
+comparação não é feita diretamente sobre os índices: em cada posição é obtida a
+cor RGB correspondente em cada imagem e comparada.
+
+\subsection*{Implementação}
+
+\begin{lstlisting}[caption={Implementação de ImageIsEqual},label={lst:imageisequal}]
+int ImageIsEqual(const Image img1, const Image img2) {
+  assert(img1 != NULL);
+  assert(img2 != NULL);
+
+  // Dimensões diferentes implicam imagens diferentes
+  if (img1->width  != img2->width ||
+      img1->height != img2->height) {
+    return 0;
+  }
+
+  // Compara a cor RGB de cada pixel
+  for (uint32 v = 0; v < img1->height; v++) {
+    for (uint32 u = 0; u < img1->width; u++) {
+      uint16 l1 = img1->image[v][u];
+      uint16 l2 = img2->image[v][u];
+
+      rgb_t c1 = img1->LUT[l1];
+      rgb_t c2 = img2->LUT[l2];
+
+      if (c1 != c2) {
+        return 0;
+      }
+    }
+  }
+
+  return 1;
+}
+\end{lstlisting}
+
+\subsection*{Análise formal}
+
+Voltando a considerar $N = W \cdot H$:
+\begin{itemize}
+  \item se as dimensões forem diferentes, a função termina logo após as
+        verificações iniciais ($O(1)$);
+  \item se as dimensões forem iguais e a primeira diferença surgir cedo na
+        varredura, o tempo também é pequeno (melhor caso);
+  \item se todas as cores forem iguais, são verificadas todas as $N$ entradas
+        da matriz, o que corresponde ao pior caso.
+\end{itemize}
+
+Assim, no pior caso:
+\[
+  T(N) = \Theta(N).
+\]
+
+Definindo como comparação o teste \texttt{c1 != c2}:
+\begin{itemize}
+  \item melhor caso (dimensões diferentes): 0 comparações de cor;
+  \item pior caso (imagens iguais): exatamente $N$ comparações.
+\end{itemize}
+
+A complexidade espacial adicional é constante ($O(1)$), pois apenas são
+usadas variáveis escalares.
+
+%--------------------------------------
+\chapter{Region Growing e Segmentação}
+%--------------------------------------
+
+\section{Preenchimento de regiões}
+
+Nesta secção descrevem-se as três variantes de \emph{region growing}:
+recursiva, baseada em pilha e baseada em fila. Todas partem da mesma ideia:
+dado um píxel semente $(u,v)$ e um novo rótulo \texttt{label}, todos os
+píxeis conectados (4-vizinhança) com o mesmo rótulo inicial são substituídos
+pelo novo rótulo.
+
+\subsection*{Versão recursiva}
+
+\begin{lstlisting}[caption={ImageRegionFillingRecursive},label={lst:rec}]
+int ImageRegionFillingRecursive(Image img, int u, int v, uint16 label) {
+  assert(img != NULL);
+  assert(ImageIsValidPixel(img, u, v));
+  assert(label < FIXED_LUT_SIZE);
+
+  static int recursionDepth = 0;
+  static uint16 targetLabel;
+  int count = 0;
+
+  if (recursionDepth == 0) {
+    targetLabel = img->image[v][u];
+    if (targetLabel == label) {
+      return 0;
+    }
+  }
+
+  recursionDepth++;
+
+  if (img->image[v][u] == targetLabel) {
+    img->image[v][u] = label;
+    count = 1;
+
+    if (ImageIsValidPixel(img, u + 1, v))
+      count += ImageRegionFillingRecursive(img, u + 1, v, label);
+    if (ImageIsValidPixel(img, u - 1, v))
+      count += ImageRegionFillingRecursive(img, u - 1, v, label);
+    if (ImageIsValidPixel(img, u, v + 1))
+      count += ImageRegionFillingRecursive(img, u, v + 1, label);
+    if (ImageIsValidPixel(img, u, v - 1))
+      count += ImageRegionFillingRecursive(img, u, v - 1, label);
+  }
+
+  recursionDepth--;
+  return count;
+}
+\end{lstlisting}
+
+Esta versão é simples e próxima da formulação matemática do problema, mas
+pode originar \emph{stack overflow} quando a região a preencher é muito
+grande.
+
+\subsection*{Versão com pilha (DFS iterativo)}
+
+\begin{lstlisting}[caption={ImageRegionFillingWithSTACK},label={lst:stack}]
+int ImageRegionFillingWithSTACK(Image img, int u, int v, uint16 label) {
+  assert(img != NULL);
+  assert(ImageIsValidPixel(img, u, v));
+  assert(label < FIXED_LUT_SIZE);
+
+  uint16 targetLabel = img->image[v][u];
+  if (targetLabel == label) {
+    return 0;
+  }
+
+  size_t maxSize = (size_t)img->width * (size_t)img->height;
+
+  typedef struct { int u, v; } Pixel;
+  Pixel* stack = malloc(maxSize * sizeof(Pixel));
+  check(stack != NULL, "RegionFillingWithSTACK: malloc");
+
+  size_t top = 0;
+
+  img->image[v][u] = label;
+  stack[top++] = (Pixel){u, v};
+  int count = 1;
+
+  while (top > 0) {
+    Pixel p = stack[--top];
+    int x = p.u;
+    int y = p.v;
+
+    if (ImageIsValidPixel(img, x + 1, y) &&
+        img->image[y][x + 1] == targetLabel) {
+      img->image[y][x + 1] = label;
+      stack[top++] = (Pixel){x + 1, y};
+      count++;
+    }
+    if (ImageIsValidPixel(img, x - 1, y) &&
+        img->image[y][x - 1] == targetLabel) {
+      img->image[y][x - 1] = label;
+      stack[top++] = (Pixel){x - 1, y};
+      count++;
+    }
+    if (ImageIsValidPixel(img, x, y + 1) &&
+        img->image[y + 1][x] == targetLabel) {
+      img->image[y + 1][x] = label;
+      stack[top++] = (Pixel){x, y + 1};
+      count++;
+    }
+    if (ImageIsValidPixel(img, x, y - 1) &&
+        img->image[y - 1][x] == targetLabel) {
+      img->image[y - 1][x] = label;
+      stack[top++] = (Pixel){x, y - 1};
+      count++;
+    }
+  }
+
+  free(stack);
+  return count;
+}
+\end{lstlisting}
+
+\subsection*{Versão com fila (BFS)}
+
+\begin{lstlisting}[caption={ImageRegionFillingWithQUEUE},label={lst:queue}]
+int ImageRegionFillingWithQUEUE(Image img, int u, int v, uint16 label) {
+  assert(img != NULL);
+  assert(ImageIsValidPixel(img, u, v));
+  assert(label < FIXED_LUT_SIZE);
+
+  uint16 targetLabel = img->image[v][u];
+  if (targetLabel == label) {
+    return 0;
+  }
+
+  size_t maxSize = (size_t)img->width * (size_t)img->height;
+
+  typedef struct { int u, v; } Pixel;
+  Pixel* queue = malloc(maxSize * sizeof(Pixel));
+  check(queue != NULL, "RegionFillingWithQUEUE: malloc");
+
+  size_t head = 0, tail = 0;
+
+  img->image[v][u] = label;
+  queue[tail++] = (Pixel){u, v};
+  int count = 1;
+
+  while (head < tail) {
+    Pixel p = queue[head++];
+    int x = p.u;
+    int y = p.v;
+
+    if (ImageIsValidPixel(img, x + 1, y) &&
+        img->image[y][x + 1] == targetLabel) {
+      img->image[y][x + 1] = label;
+      queue[tail++] = (Pixel){x + 1, y};
+      count++;
+    }
+    if (ImageIsValidPixel(img, x - 1, y) &&
+        img->image[y][x - 1] == targetLabel) {
+      img->image[y][x - 1] = label;
+      queue[tail++] = (Pixel){x - 1, y};
+      count++;
+    }
+    if (ImageIsValidPixel(img, x, y + 1) &&
+        img->image[y + 1][x] == targetLabel) {
+      img->image[y + 1][x] = label;
+      queue[tail++] = (Pixel){x, y + 1};
+      count++;
+    }
+    if (ImageIsValidPixel(img, x, y - 1) &&
+        img->image[y - 1][x] == targetLabel) {
+      img->image[y - 1][x] = label;
+      queue[tail++] = (Pixel){x, y - 1};
+      count++;
+    }
+  }
+
+  free(queue);
+  return count;
+}
+\end{lstlisting}
+
+\section{\texttt{ImageSegmentation}}
+
+\begin{lstlisting}[caption={Implementação de ImageSegmentation},label={lst:seg}]
+int ImageSegmentation(Image img, FillingFunction fillFunct) {
+  assert(img != NULL);
+  assert(fillFunct != NULL);
+
+  int regions = 0;
+  rgb_t color = 0x000000;
+
+  for (uint32 v = 0; v < img->height; v++) {
+    for (uint32 u = 0; u < img->width; u++) {
+      if (img->image[v][u] == 0) { // label de fundo
+        color = GenerateNextColor(color);
+        uint16 newLabel = (uint16)LUTAllocColor(img, color);
+        (void)fillFunct(img, (int)u, (int)v, newLabel);
+        regions++;
+      }
+    }
+  }
+
+  return regions;
+}
+\end{lstlisting}
+
+Em termos de complexidade, cada píxel é visitado no máximo uma vez como parte
+de uma região. Assim, o custo total de \texttt{ImageSegmentation} é
+$\Theta(N)$, onde $N$ é o número total de píxeis da imagem.
+
+%--------------------------------------
+\chapter{Conclusões}
+%--------------------------------------
+
+O TAD \texttt{imageRGB} oferece uma estrutura modular para manipulação de
+imagens RGB com base em índices e LUT. As funções implementadas neste trabalho
+(\texttt{ImageCopy}, \texttt{ImageIsEqual}, rotações, preenchimento de
+regiões e segmentação) permitem realizar tarefas básicas de processamento de
+imagens de forma eficiente.
+
+A análise de \texttt{ImageIsEqual} confirma que a complexidade temporal é
+linear no número de píxeis, e as três variantes de \emph{region growing}
+apresentam custos proporcionais ao tamanho da região preenchida, com vantagens
+claras para as versões iterativas em termos de robustez.
+
+Em termos de gestão de memória, o recurso a ferramentas de análise dinâmica,
+como Valgrind e AddressSanitizer, é recomendado para garantir ausência de
+fugas e acessos inválidos, sobretudo em projetos maiores.
+
+%--------------------------------------
+\appendix
+%--------------------------------------
+
+\chapter{Plano de verificação dinâmica}
+
+\section*{Compilação e testes}
+
+\begin{verbatim}
+# compilação normal
+make clean
+gcc -g -O0 -Wall -Wextra *.c -o image_test
+
+# compilação com ASAN
+gcc -fsanitize=address -g -O1 *.c -o image_asan
+
+# execução com Valgrind
+valgrind --leak-check=full --show-leak-kinds=all \
+         --track-origins=yes ./image_test
+\end{verbatim}
+
+\section*{Formato de saída esperado (exemplo)}
+
+\begin{verbatim}
+==12345== HEAP SUMMARY:
+==12345==    definitely lost: 0 bytes in 0 blocks
+==12345==    indirectly lost: 0 bytes in 0 blocks
+==12345==      possibly lost: 0 bytes in 0 blocks
+==12345==    still reachable: 72,704 bytes in 14 blocks
+==12345==         suppressed: 0 bytes in 0 blocks
+\end{verbatim}
+
+%--------------------------------------
+\end{document}

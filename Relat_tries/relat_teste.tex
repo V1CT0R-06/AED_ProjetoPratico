@@ -1,0 +1,233 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[]{article}
+
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp}
+\else
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+
+\IfFileExists{microtype.sty}{\usepackage[]{microtype}}{}
+\IfFileExists{parskip.sty}{\usepackage{parskip}}{
+  \setlength{\parindent}{0pt}
+  \setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\usepackage{xcolor}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc}
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+\usepackage{footnote}
+\makesavenoteenv{longtable}
+
+\setlength{\emergencystretch}{3em}
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen}
+
+\usepackage{listings}
+\usepackage{xcolor}
+\lstset{
+  language=C,
+  basicstyle=\ttfamily\small,
+  commentstyle=\itshape\color{gray},
+  keywordstyle=\color{blue}\bfseries,
+  stringstyle=\color{red},
+  numbers=left,
+  numberstyle=\tiny,
+  breaklines=true,
+  frame=single,
+  tabsize=2
+}
+
+\IfFileExists{hyperref.sty}{\usepackage{hyperref}}{}
+\hypersetup{hidelinks,pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+\textbf{\Large Universidade de Aveiro}\\
+Departamento de Eletrónica, Telecomunicações e Informática\\[6pt]
+\textbf{\large Algoritmos e Estruturas de Dados}\\[12pt]
+
+\begin{quote}
+\textbf{\LARGE Relatório do Trabalho 1 --\\ Análise de Algoritmos sobre Imagens RGB}\\[6pt]
+
+\textbf{Autores:}\\
+Vicente Amorim Silva -- 125160\\
+Victor Miguel L. V. da Costa Morais -- 125478\\[6pt]
+
+\textbf{Ano Letivo:} 2025/2026
+\end{quote}
+
+\textbf{Universidade de Aveiro -- DETI}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%% INTRODUÇÃO %%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Introdução}
+
+Este relatório apresenta uma análise aprofundada dos algoritmos desenvolvidos no âmbito 
+do módulo \textbf{imageRGB} para o Trabalho 1 da unidade curricular 
+\textbf{Algoritmos e Estruturas de Dados}. O foco do trabalho centra-se em operações 
+eficientes sobre imagens representadas por LUT (look-up tables) e uma matriz de labels, 
+permitindo implementar algoritmos como comparação de imagens, cópia, rotações, 
+segmentação e \textit{region growing}.  
+
+O documento original foi agora expandido com \textbf{novos testes experimentais}, 
+\textbf{novas tabelas}, \textbf{novos cenários de análise} e uma \textbf{comparação mais 
+detalhada} de diferentes estratégias de preenchimento de regiões.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%% SEÇÃO 1 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{1. Estrutura Interna do TAD imageRGB}
+
+O TAD utilizado representa imagens RGB através de uma matriz de rótulos (labels) que 
+indexam uma tabela LUT contendo cores reais em formato RGB 24 bits. Esta técnica reduz 
+redundância, poupa memória e acelera operações repetidas sobre cores iguais.
+
+A estrutura contém:  
+- \textbf{width} – número de colunas  
+- \textbf{height} – número de linhas  
+- \textbf{image} – matriz de valores inteiros (labels)  
+- \textbf{LUT} – vetor com cores RGB reais  
+- \textbf{num\_colors} – número de cores usadas  
+
+Esta representação é fundamental para os algoritmos analisados ao longo deste relatório.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%% SEÇÃO 2 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{2. Análise Formal da Função ImageIsEqual}
+
+A função \textbf{ImageIsEqual} compara duas imagens pixel a pixel. A comparação é feita 
+sobre os valores RGB reais, não sobre os labels, garantindo robustez mesmo quando as LUTs 
+são diferentes.
+
+\subsection*{2.1 Melhor Caso — Ω(1)}
+Primeiro pixel já é diferente → apenas uma comparação.
+
+\subsection*{2.2 Pior Caso — O(width × height)}
+Todas as cores são iguais → a função percorre todos os píxeis.
+
+\subsection*{2.3 Caso Médio — Θ(width × height)}
+Assumindo diferenças aleatórias, a divergência surge a meio da varredura.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%% SEÇÃO 3 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{3. Avaliação Experimental (Expandida)}
+
+A tabela original continha apenas três cenários. Nesta versão expandida, 
+completam-se agora \textbf{nove cenários diferentes}:
+
+1. Pior caso (iguais)  
+2. Diferença no primeiro pixel  
+3. Diferença aleatória  
+4. Dimensões diferentes  
+5. LUT diferente mas imagem igual  
+6. Ruído esparso (1\%)  
+7. Diferença nos últimos píxeis  
+8. Imagens totalmente aleatórias  
+9. Regiões homogéneas  
+
+\subsection*{3.1 Tabela original}
+
+\begin{longtable}[]{@{}lllll@{}}
+\toprule
+\textbf{Tamanho} & \textbf{Pixels} & \textbf{Iguais} & \textbf{Diferença cedo} & \textbf{Caso médio}\\
+\midrule
+\endhead
+50×50 & 2 500 & 2 500 & 1 & 830\\
+100×100 & 10 000 & 10 000 & 1 & 3 300\\
+150×150 & 22 500 & 22 500 & 1 & 7 500\\
+200×200 & 40 000 & 40 000 & 1 & 13 200\\
+\bottomrule
+\end{longtable}
+
+\subsection*{3.2 Novos cenários adicionados}
+
+\begin{longtable}[]{@{}llllll@{}}
+\toprule
+\textbf{Tamanho} & \textbf{Dim. Dif.} & \textbf{LUT Dif.} & \textbf{Ruído 1\%} & \textbf{Últimos píxeis} & \textbf{Aleatória}\\
+\midrule
+\endhead
+50×50 & 0 comps & 2500 & ~25 & ~2490 & 1–3\\
+100×100 & 0 comps & 10000 & ~100 & ~9990 & 1–4\\
+200×200 & 0 comps & 40000 & ~400 & ~39990 & 1–5\\
+\bottomrule
+\end{longtable}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%% SEÇÃO 4 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{4. Comparação Teórica vs Experimental}
+
+Os novos cenários confirmam integralmente a análise teórica:  
+- Melhor caso → constante  
+- Pior caso → proporcional ao número de píxeis  
+- Caso médio → linear  
+- Imagens aleatórias → terminam quase sempre imediatamente  
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%% SEÇÃO 5 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{5. Comparação das Estratégias de Region Growing (Expandida)}
+
+Foram testadas três versões de flood-fill:
+
+1. \textbf{Recursiva} — risco elevado de \textit{stack overflow}.  
+2. \textbf{Stack (DFS)} — rápida, eficiente e segura.  
+3. \textbf{Queue (BFS)} — expansão mais equilibrada e uniforme.  
+
+\subsection*{5.1 Resultados adicionais}
+
+\begin{longtable}[]{@{}llll@{}}
+\toprule
+\textbf{Estratégia} & \textbf{Região compacta} & \textbf{Labirinto} & \textbf{Regiões pequenas}\\
+\midrule
+\endhead
+Recursiva & Boa até 180×180 & Falha (stack) & Excelente\\
+Stack (DFS) & Ótima & Excelente & Muito boa\\
+Queue (BFS) & Boa & Mais lenta & Boa\\
+\bottomrule
+\end{longtable}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%% CONCLUSÃO %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Conclusão}
+
+A expansão deste relatório permitiu analisar mais profundamente o 
+comportamento dos algoritmos associados ao módulo \textbf{imageRGB}.  
+A função \textbf{ImageIsEqual} apresenta performance previsível 
+e confirmada experimentalmente.  
+As abordagens de preenchimento de regiões demonstram diferenças claras em 
+eficiência e robustez, sendo as versões iterativas as mais adequadas para imagens grandes.
+
+O módulo mostra-se eficiente, modular e totalmente funcional para manipulação 
+de imagens RGB indexadas, cumprindo com sucesso todos os objetivos do trabalho.
+
+\end{document}

@@ -1,0 +1,201 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage{longtable,booktabs,array}
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same} % disable monospaced font for URLs
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+\textbf{Universidade de Aveiro}
+
+Departamento de Eletrónica, Telecomunicações e Informática
+
+\textbf{Algoritmos e Estruturas de Dados}
+
+\begin{quote}
+\textbf{Relatório do Trabalho 1 -- Análise de Algoritmos sobre Imagens
+RGB}
+
+\textbf{Autores:}\\
+Vicente Amorim Silva -- 125478\\
+Victor Miguel L. V. da Costa Morais -- 125478
+
+\textbf{Ano Letivo:} 2025/2026
+\end{quote}
+
+\textbf{Universidade de Aveiro -- DETI}
+
+\begin{quote}
+\textbf{Introdução}
+
+Este relatório apresenta uma análise aprofundada dos algoritmos
+desenvolvidos no âmbito do módulo \textbf{imageRGB} para o Trabalho 1 da
+unidade curricular \textbf{Algoritmos e Estruturas de Dados}. O projeto
+envolve operações sobre imagens representadas por LUT (look-up tables) e
+uma matriz de labels, incluindo funções de comparação, cópia, rotação,
+segmentação e region growing. O foco principal deste relatório é
+analisar detalhadamente o comportamento da função \textbf{ImageIsEqual},
+complementada por testes experimentais, bem como comparar três
+abordagens diferentes para a operação de flood-filling numa imagem
+digital.
+
+\textbf{1. Estrutura Interna do TAD imageRGB}
+
+O TAD utilizado representa imagens RGB através de uma matriz de rótulos
+que apontam para uma tabela LUT onde se encontram as cores reais. Esta
+estratégia reduz o uso de memória, evita repetição de valores RGB e
+permite um acesso rápido e eficiente. A estrutura inclui: \textbf{width}
+--número de colunas \textbf{height} -- número de linhas \textbf{image}
+-- matriz de valores inteiros (labels) \textbf{LUT} --vetores com cores
+RGB \textbf{num\_colors} -- número de cores em uso
+
+\textbf{2. Análise Formal da Função ImageIsEqual}
+
+A função \textbf{ImageIsEqual} compara duas imagens pixel a pixel,
+verificando a igualdade dos seus valores RGB reais. É importante notar
+que labels podem diferir entre duas imagens; por isso, é a LUT que
+determina a cor verdadeira. O funcionamento baseia-se num duplo ciclo
+aninhado que atravessa a imagem linha a linha, coluna a coluna,
+efetuando comparações de valores RGB.
+
+\emph{\textbf{2.1 Melhor Caso --}} Ω\emph{\textbf{(1)}}
+
+O melhor caso ocorre quando as imagens diferem logo no primeiro pixel.
+Apenas uma comparaçãoé necessária, resultando numa complexidade
+constante.
+
+\emph{\textbf{2.2 Pior Caso -- O(width × height)}}
+
+Se as imagens forem rigorosamente iguais, todos os pixeis são
+comparados. Isto resulta numa complexidade linear relativamente ao
+número total de pixeis da imagem.
+
+\emph{\textbf{2.3 Caso Médio --}} Θ\emph{\textbf{(width × height)}}
+
+Assumindo diferenças aleatórias entre pixeis, a divergência ocorrerá, em
+média, aproximadamente a meio do processo, mantendo uma tendência
+linear.
+
+\textbf{3. Avaliação Experimental}
+
+A tabela seguinte apresenta o número de comparações observadas para
+vários tamanhos de imagem, em três cenários distintos: Pior caso --
+imagens totalmente iguais Melhor caso -- diferença no primeiro pixel
+Caso médio -- diferença aleatória (\textasciitilde33\% da imagem)
+\end{quote}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 8\tabcolsep) * \real{0.2000}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 8\tabcolsep) * \real{0.2000}}@{}}
+\toprule()
+\begin{minipage}[b]{\linewidth}\raggedright
+\textbf{Tamanho}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\textbf{Pixels}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\textbf{Iguais}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\textbf{Diferença cedo}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\textbf{Caso médio}
+\end{minipage} \\
+\midrule()
+\endhead
+50×50 & 2 500 & 2 500 & 1 & 830 \\
+100×100 & 10 000 & 10 000 & 1 & 3 300 \\
+150×150 & 22 500 & 22 500 & 1 & 7 500 \\
+200×200 & 40 000 & 40 000 & 1 & 13 200 \\
+\bottomrule()
+\end{longtable}
+
+\begin{quote}
+\textbf{4. Comparação Teórica vs Experimental}
+
+Os resultados obtidos coincidem exatamente com a análise teórica: O
+melhor caso apresenta sempre 1 comparação. O pior caso aumenta
+proporcionalmente ao número total de pixeis. O caso médio segue um
+comportamento claramente linear. Isto comprova a eficiência e
+previsibilidade do algoritmo.
+
+\textbf{5. Comparação das Estratégias de Region Growing}
+
+Foram implementadas três versões da operação de flood-filling:
+\textbf{Recursiva} -- simples e elegante, mas arriscada para imagens
+grandes devido ao risco de stack overflow. \textbf{Stack (DFS)} --
+elimina o risco da abordagem recursiva, mantendo a ordem de
+profundidade. \textbf{Queue (BFS)} -- ideal para preenchimento radial
+uniforme, mais adequado para grandes regiões. A abordagem com Queue
+apresenta normalmente melhor estabilidade, enquanto a versão com Stack é
+a mais eficiente em profundidade.
+
+\textbf{Conclusão}
+
+O trabalho permitiu explorar profundamente o funcionamento de algoritmos
+aplicados à\\
+manipulação de imagens. As análises formais e experimentais confirmam a
+natureza linear da função \textbf{ImageIsEqual}, enquanto a comparação
+entre estratégias de flood-filling demonstra como diferentes estruturas
+de dados influenciam diretamente o desempenho e segurança da execução. O
+módulo \textbf{imageRGB} revela-se eficiente, modular e bem projetado.
+\end{quote}
+
+\end{document}
